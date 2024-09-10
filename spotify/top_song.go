@@ -3,23 +3,23 @@ package spotify
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"spotify-stats-cli/cnsts"
 	"spotify-stats-cli/env"
 	"spotify-stats-cli/types"
+	"spotify-stats-cli/util"
 	"strings"
 )
 
-func refreshAccessToken() (string, error) {
+func refreshAccessToken() string {
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", SpotifyVars.RefreshToken)
 
 	req, err := http.NewRequest("POST", cnsts.TOKEN_URL, strings.NewReader(data.Encode()))
 	if err != nil {
-		return "", err
+		util.EndWithErr("cannot create Spotify refresh token request")
 	}
 
 	req.SetBasicAuth(SpotifyVars.ClientID, SpotifyVars.ClientSecret)
@@ -28,30 +28,30 @@ func refreshAccessToken() (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		util.EndWithErr("cannot send request to Spotify refresh token URL")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		util.EndWithErr("cannot read response body from Spotify refresh token URL")
 	}
 
 	var tokenResponse types.TokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return "", err
+		util.EndWithErr("cannot unmarshal response body from Spotify refresh token URL")
 	}
 
 	SpotifyVars.AccessToken = tokenResponse.AccessToken
 	env.WriteToEnvFile(SpotifyVars.ClientID, SpotifyVars.ClientSecret, tokenResponse.AccessToken, SpotifyVars.RefreshToken)
 
-	return tokenResponse.AccessToken, nil
+	return tokenResponse.AccessToken
 }
 
-func fetchTopItems(url string) ([]byte, error) {
+func topItemsBytes(url string) []byte {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		util.EndWithErr("cannot create Spotify top tracks request")
 	}
 
 	req.Header.Set("Authorization", "Bearer "+SpotifyVars.AccessToken)
@@ -59,40 +59,39 @@ func fetchTopItems(url string) ([]byte, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		util.EndWithErr("cannot send request to Spotify top tracks URL")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		newAccessToken, err := refreshAccessToken()
-		if err != nil {
-			return nil, err
-		}
+		newAccessToken := refreshAccessToken()
 		newReq, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			return nil, err
+			util.EndWithErr("cannot create Spotify top tracks request")
 		}
 		newReq.Header.Set("Authorization", "Bearer "+newAccessToken)
 
 		resp, err = client.Do(newReq)
 		if err != nil {
-			return nil, err
+			util.EndWithErr("cannot send request to Spotify top tracks URL")
 		}
 		defer resp.Body.Close()
 	}
 
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		util.EndWithErr("cannot read response body from Spotify top tracks URL")
+	}
+
+	return body
 }
 
 func TopSong() types.Track {
-	topTracksBytes, err := fetchTopItems(cnsts.TOP_TRACKS_URL)
-	if err != nil {
-		log.Fatal("Failed to fetch top tracks")
-	}
+	topTracksBytes := topItemsBytes(cnsts.TOP_TRACKS_URL)
 
 	topTracksResponse := types.TopTracksResponse{}
 	if err := json.Unmarshal(topTracksBytes, &topTracksResponse); err != nil {
-		log.Fatal("Failed to unmarshal top tracks")
+		util.EndWithErr("cannot unmarshal top tracks")
 	}
 
 	tracks := topTracksResponse.Items

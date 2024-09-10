@@ -13,13 +13,13 @@ import (
 func BasePath() string {
 	execPath, err := os.Executable()
 	if err != nil {
-		panic(err)
+		EndWithErr("cannot get executable path")
 	}
 
 	execDir := filepath.Dir(execPath)
 	cwd, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		EndWithErr("cannot get current working directory")
 	}
 
 	if filepath.Base(execPath) == "go.exe" || filepath.Base(execPath) == "go" && strings.HasPrefix(cwd, os.TempDir()) {
@@ -29,22 +29,22 @@ func BasePath() string {
 	return cwd
 }
 
-func AnsiImage(url string) (string, error) {
+func AnsiImage(url string) string {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		EndWithErr("cannot get image from URL")
 	}
 
 	defer resp.Body.Close()
 
 	img, _, err := image.Decode(resp.Body)
 	if err != nil {
-		return "", err
+		EndWithErr("cannot decode image")
 	}
 
 	ansiImage := conv.Convert(img)
 
-	return ansiImage, nil
+	return ansiImage
 }
 
 func formatTrackText(trackText string) string {
@@ -56,7 +56,7 @@ func formatTrackText(trackText string) string {
 	return trackText
 }
 
-func WriteOutputToFile(ansiImage string, trackText string) (string, error) {
+func WriteOutputToFile(ansiImage string, trackText string) string {
 	outputFile := cnsts.OUTPUT_FILE_NAME
 	basePath := BasePath()
 
@@ -64,7 +64,8 @@ func WriteOutputToFile(ansiImage string, trackText string) (string, error) {
 	if err != nil {
 		file, err = os.Create(basePath + "/" + outputFile)
 		if err != nil {
-			return "", err
+			os.Stderr.WriteString("Cannot create output file\n")
+			os.Exit(1)
 		} else {
 			outputFile = basePath + "/" + outputFile
 		}
@@ -77,14 +78,16 @@ func WriteOutputToFile(ansiImage string, trackText string) (string, error) {
 	if ansiImage == "" || trackText == "" {
 		_, err = file.WriteString("")
 		if err != nil {
-			return "", err
+			os.Stderr.WriteString("Cannot write to file\n")
+			os.Exit(1)
 		}
 	} else {
 		_, err = file.WriteString(ansiImage + "\n" + formatTrackText(trackText) + "\n\n")
 		if err != nil {
-			return "", err
+			os.Stderr.WriteString("Cannot write to file\n")
+			os.Exit(1)
 		}
 	}
 
-	return outputFile, nil
+	return outputFile
 }

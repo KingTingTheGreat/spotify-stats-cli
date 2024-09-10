@@ -1,7 +1,6 @@
 package env
 
 import (
-	"log"
 	"os"
 	"spotify-stats-cli/types"
 	"spotify-stats-cli/util"
@@ -30,7 +29,7 @@ func LoadEnvVars() types.SpotifyVars {
 	if err != nil {
 		err = godotenv.Load(basePath + "/.env")
 		if err != nil {
-			log.Fatal("Error loading .env file", err)
+			util.EndWithErr("cannot load .env file")
 		} else {
 			env_file = basePath + "/.env"
 		}

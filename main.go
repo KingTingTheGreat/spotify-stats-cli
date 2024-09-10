@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"spotify-stats-cli/env"
-	"spotify-stats-cli/hndle_err"
 	"spotify-stats-cli/spotify"
 	"spotify-stats-cli/util"
 )
@@ -12,7 +11,7 @@ func main() {
 	env.LoadEnvVars()
 
 	if spotify.SpotifyVars.ClientID == "" || spotify.SpotifyVars.ClientSecret == "" {
-		hndle_err.EndWithErr("Missing client ID or client secret")
+		util.EndWithErr("Missing client ID or client secret")
 	}
 
 	if spotify.SpotifyVars.AccessToken == "" || spotify.SpotifyVars.RefreshToken == "" {
@@ -24,15 +23,9 @@ func main() {
 	trackText := topTrack.Name + " - " + topTrack.Artists[0].Name
 
 	// get ansi image
-	ansiImage, err := util.AnsiImage(topTrack.Album.Images[0].Url)
-	if err != nil {
-		hndle_err.EndWithErr("Cannot get ansi image")
-	}
+	ansiImage := util.AnsiImage(topTrack.Album.Images[0].Url)
 
-	outputFile, err := util.WriteOutputToFile(ansiImage, trackText)
-	if err != nil {
-		hndle_err.EndWithErr("Cannot write to file")
-	}
+	outputFile := util.WriteOutputToFile(ansiImage, trackText)
 
 	os.Stdout.WriteString(outputFile)
 }

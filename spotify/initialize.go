@@ -9,6 +9,7 @@ import (
 	"spotify-stats-cli/cnsts"
 	"spotify-stats-cli/env"
 	"spotify-stats-cli/types"
+	"spotify-stats-cli/util"
 	"strings"
 )
 
@@ -25,7 +26,7 @@ func getAuthURL() string {
 	return fmt.Sprintf("%s?%s", cnsts.AUTH_URL, params.Encode())
 }
 
-func exchangeCodeForToken(code string) error {
+func exchangeCodeForToken(code string) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
@@ -33,7 +34,7 @@ func exchangeCodeForToken(code string) error {
 
 	req, err := http.NewRequest("POST", cnsts.TOKEN_URL, strings.NewReader(data.Encode()))
 	if err != nil {
-		return err
+		util.EndWithErr("cannot create Spotify token request")
 	}
 
 	req.SetBasicAuth(SpotifyVars.ClientID, SpotifyVars.ClientSecret)
@@ -42,25 +43,23 @@ func exchangeCodeForToken(code string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		util.EndWithErr("cannot send request to Spotify token URL")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		util.EndWithErr("cannot read response body from Spotify token URL")
 	}
 
 	var tokenResponse types.TokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return err
+		util.EndWithErr("cannot unmarshal response body from Spotify token URL")
 	}
 
 	SpotifyVars.AccessToken = tokenResponse.AccessToken
 	SpotifyVars.RefreshToken = tokenResponse.RefreshToken
 	env.WriteToEnvFile(SpotifyVars.ClientID, SpotifyVars.ClientSecret, tokenResponse.AccessToken, tokenResponse.RefreshToken)
-
-	return nil
 }
 
 func callbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,11 +71,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := exchangeCodeForToken(code)
-	if err != nil {
-		http.Error(w, "Failed to exchange code for token", http.StatusInternalServerError)
-		return
-	}
+	exchangeCodeForToken(code)
 }
 
 func InitializeSpotifyAccess() {
